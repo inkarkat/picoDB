@@ -8,7 +8,7 @@
 #
 ###############################################################################
 # CONTENTS:
-#   A primitive file-based dictionary supporting CRUD operations.
+#   A primitive file-based set supporting CRUD operations.
 #
 # REMARKS:
 #
