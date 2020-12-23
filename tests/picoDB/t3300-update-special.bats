@@ -9,10 +9,19 @@ load temp_database
     [ "${lines[2]%% *}" = 'Usage:' ]
 }
 
-@test "update of a table with an empty key is accepted" {
+@test "update of a table with an empty key is not accepted by default" {
     initialize_table "$BATS_TEST_NAME" from one-entry
 
     run picoDB --table "$BATS_TEST_NAME" --update ""
+    [ $status -eq 2 ]
+    [ "$output" = 'ERROR: Empty KEY not allowed.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 1 ]
+}
+
+@test "update of a table with an empty key is accepted with --allow-empty-key" {
+    initialize_table "$BATS_TEST_NAME" from one-entry
+
+    run picoDB --table "$BATS_TEST_NAME" --allow-empty-key --update ""
     [ $status -eq 0 ]
     assert_table_row "$BATS_TEST_NAME" \$ ""
     [ "$(get_row_number "$BATS_TEST_NAME")" -eq 2 ]

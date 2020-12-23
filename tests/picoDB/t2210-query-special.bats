@@ -2,8 +2,14 @@
 
 load canned_databases
 
-@test "empty key can be queried" {
-    picoDB --table special --query ''
+@test "empty key cannot be queried by default" {
+    run picoDB --table special --query ''
+    [ $status -eq 2 ]
+    [ "$output" = 'ERROR: Empty KEY not allowed.' ]
+}
+
+@test "empty key can be queried with --allow-empty-key" {
+    picoDB --table special --allow-empty-key --query ''
 }
 
 @test "key with = in it can be queried" {

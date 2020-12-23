@@ -9,10 +9,10 @@ load temp_database
     [ "${lines[2]%% *}" = 'Usage:' ]
 }
 
-@test "an empty delete key is accepted but not found" {
+@test "an allowed empty delete key is accepted but not found" {
     initialize_table "$BATS_TEST_NAME" from one-entry
 
-    run picoDB --table "$BATS_TEST_NAME" --delete ""
+    run picoDB --table "$BATS_TEST_NAME" --allow-empty-key --delete ""
     [ $status -eq 4 ]
 }
 

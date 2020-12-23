@@ -35,12 +35,23 @@ load temp_database
     ! table_exists "$BATS_TEST_NAME"
 }
 
-@test "an empty delete key is deleted" {
+@test "an empty delete key cannot be deleted by default" {
     initialize_table "$BATS_TEST_NAME" from one-entry
-    picoDB --table "$BATS_TEST_NAME" --update ""
+    picoDB --table "$BATS_TEST_NAME" --allow-empty-key --update ""
     picoDB --table "$BATS_TEST_NAME" --update "last"
 
     run picoDB --table "$BATS_TEST_NAME" --delete ""
+    [ $status -eq 2 ]
+    [ "$output" = 'ERROR: Empty KEY not allowed.' ]
+    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 3 ]
+}
+
+@test "an empty delete key is deleted with --allow-empty-key" {
+    initialize_table "$BATS_TEST_NAME" from one-entry
+    picoDB --table "$BATS_TEST_NAME" --allow-empty-key --update ""
+    picoDB --table "$BATS_TEST_NAME" --update "last"
+
+    run picoDB --table "$BATS_TEST_NAME" --allow-empty-key --delete ""
     [ $status -eq 0 ]
     [ "$(get_row_number "$BATS_TEST_NAME")" -eq 2 ]
     assert_table_row "$BATS_TEST_NAME" 1 "The Foo is 42"
