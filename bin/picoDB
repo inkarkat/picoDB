@@ -94,6 +94,7 @@ Example:
 HELPTEXT
 printf '%q %s\n' "$(basename "$1")" '-t "$scriptName" --update foo'
 printf '%q %s && echo "we have foo"\n' "$(basename "$1")" '-t "$scriptName" --exists foo'
+printf 'eval "$(%q %s)"; [ -n "${keys["foo"]}" ] && echo "we have foo"\n' "$(basename "$1")" '-t "$scriptName" --get-as-dictionary keys'
 }
 
 checkKeyArg()
