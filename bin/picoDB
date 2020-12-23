@@ -92,10 +92,12 @@ printf '%q %s\n' "$(basename "$1")" '-t "$scriptName" --update foo'
 printf '%q %s && echo "we have foo"\n' "$(basename "$1")" '-t "$scriptName" --exists foo'
 }
 
-assertKeyArg()
+checkKeyArg()
 {
-    echo >&2 'ERROR: Need KEY argument.'
-    exit 2
+    if [ $# -eq 0 ]; then
+	echo >&2 'ERROR: Need KEY argument.'
+	exit 2
+    fi
 }
 literalPattern()
 {
@@ -160,19 +162,19 @@ do
 			;;
 	--add|-a|--update|-u)
 			shift; [ -n "$action" -a "$action" != 'update' ] && multipleActionsError "$0"; action='update'
-			[ $# -eq 0 ] && assertKeyArg
+			checkKeyArg "$@"
 			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
 			keys+=("$key")
 			;;
 	--delete|-d)	shift; [ "$action" ] && multipleActionsError "$0"; action='delete'
-			[ $# -eq 0 ] && assertKeyArg
+			checkKeyArg "$@"
 			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
 			;;
 	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='truncate';;
 	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
 	--exists|-e|--query|-q)
 			shift; [ "$action" ] && multipleActionsError "$0"; action='query'
-			[ $# -eq 0 ] && assertKeyArg
+			checkKeyArg "$@"
 			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
 			;;
 	--get-all|-G)	shift; [ "$action" ] && multipleActionsError "$0"; action='getAll';;
