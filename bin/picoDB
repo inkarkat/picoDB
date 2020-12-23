@@ -1,0 +1,328 @@
+#!/bin/bash
+###############################################################################
+##
+# FILE:		picoDB
+# PRODUCT:	tools
+# AUTHOR:	Ingo Karkat <ingo@karkat.de>
+# DATE CREATED:	23-Dec-2020
+#
+###############################################################################
+# CONTENTS:
+#   A primitive file-based dictionary supporting CRUD operations.
+#
+# REMARKS:
+#
+# @(#)picoDB	$Id$	tools
+###############################################################################
+shopt -qs extglob
+
+baseDir="${XDG_DATA_HOME:-$HOME/.local/share}"
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--basedir DIR|--base-type config|data|runtime|cache|temp] [-n|--namespace NAMESPACE] -t|--table TABLE [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -a|--add|-u|--update KEY [...]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -d|--delete KEY'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -C|--truncate'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -e|--exists|-q|--query KEY'
+    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Records and retrieves individual KEYs inside a TABLE [within NAMESPACE], using
+simple line-based records as storage.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --basedir DIR		Set the base directory in which the NAMESPACE
+				dir / TABLE file is stored. Defaults to
+				XDG_DATA_HOME=${baseDir}
+    --base-type config|data|runtime|cache|temp
+				Set the base directory based on the passed
+				characterization. The default is "data".
+    --namespace|-n NAMESPACE	Optional application / use case for this tool's
+				use. Determines the configuration directory.
+    --table|-t TABLE		Category in the context of the application.
+				Determines the configuration file.
+    --add|-a|--update|-u KEY	Record KEY. An existing record is overwritten,
+				else it is appended.
+    --delete|-d KEY		Delete any existing KEY record. When this is the
+				last record, the file will be completely removed.
+    --truncate|-C		Delete all existing records; just keep a single
+				empty line. Creates the table if it doesn't
+				exist yet.
+    --drop|-D			Completely wipe all records and the table
+				configuration file itself.
+    --exists|-e|--query|-q KEY	Query whether KEY exists.
+    --get-all|-G		Get all records. Newline characters inside a KEY
+				are escaped as \n; backslashes are doubled. You
+				can use this to unescape:
+				    echo -e "\${line/#-/\\x2d}"
+    --get-as-dictionary DICT-NAME
+				Get all records as keys of a Bash associative
+				array named DICT-NAME if you "eval" the output.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to read / write / remove the table file.
+    2	Bad invocation, wrong or missing command-line arguments.
+    3	Internal error or failed assertion.
+    4	The queried KEY / to-be-deleted key does not exist.
+
+Example:
+HELPTEXT
+printf '%q %s\n' "$(basename "$1")" '-t "$scriptName" --update foo'
+printf '%q %s && echo "we have foo"\n' "$(basename "$1")" '-t "$scriptName" --exists foo'
+}
+
+assertKeyArg()
+{
+    echo >&2 'ERROR: Need KEY argument.'
+    exit 2
+}
+literalPattern()
+{
+    sed -e 's/[][\$*.^/]/\\&/g'
+}
+escapeNewline()
+{
+    sed ':a; s/\\/\\\\/g; x; G; 1s/\n//; s/\n/\\n/; h; N; s/.*\n//; ta' <<<"${1?}"
+}
+unescape()
+{
+    [ $# -ge 1 ] && line="$1"
+    echo -e "${line/#-/\\x2d}"
+}
+readonly ACTIONS='--add / --update, --delete, --truncate, --drop, --exists / --query, --get-all, --get-as-dictionary'
+multipleActionsError()
+{
+    echo >&2 "ERROR: Only one of $ACTIONS allowed."
+    echo >&2
+    printUsage "$1" >&2
+    exit 2
+}
+namespace=
+table=
+key=
+typeset -a keys=()
+value=
+action=
+typeset -a queriedColumns=()
+typeset -A updatedColumnValues=()
+isOmitKey=
+outputFormat=
+dictName=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--basedir)	shift; baseDir="$1"; shift;;
+	--base-type)	shift
+			case "$1" in
+			    config)	baseDir="${XDG_CONFIG_HOME:-$HOME/.config}";;
+			    data)	baseDir="${XDG_DATA_HOME:-$HOME/.local/share}";;
+			    runtime)	baseDir="${XDG_RUNTIME_DIR:-/run/user/$UID}";;
+			    cache)	baseDir="${XDG_CACHE_HOME:-$HOME/.cache}";;
+			    temp)	baseDir="${TMPDIR:-/tmp}";;
+			    *)		printf >&2 'ERROR: Invalid base-type "%s".\n' "$1"
+					echo >&2
+					printUsage "$0" >&2
+					exit 2
+					;;
+			esac
+			shift
+			;;
+	--namespace|-n)	shift; namespace="$1"; shift;;
+	--table|-t)	shift; table="$1"; shift
+			if [[ "$table" = */* ]]; then
+			    echo 'ERROR: TABLE must not contain slashes.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
+	--add|-a|--update|-u)
+			shift; [ -n "$action" -a "$action" != 'update' ] && multipleActionsError "$0"; action='update'
+			[ $# -eq 0 ] && assertKeyArg
+			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
+			keys+=("$key")
+			;;
+	--delete|-d)	shift; [ "$action" ] && multipleActionsError "$0"; action='delete'
+			[ $# -eq 0 ] && assertKeyArg
+			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
+			;;
+	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='truncate';;
+	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
+	--exists|-e|--query|-q)
+			shift; [ "$action" ] && multipleActionsError "$0"; action='query'
+			[ $# -eq 0 ] && assertKeyArg
+			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
+			;;
+	--get-all|-G)	shift; [ "$action" ] && multipleActionsError "$0"; action='getAll';;
+	--get-as-dictionary)
+			shift; [ "$action" ] && multipleActionsError "$0"; action='getAsDictionary'
+			dictName="$1"; shift
+			if [ -z "$dictName" ]; then
+			    echo 'ERROR: Need DICT-NAME.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    echo "ERROR: Additional argument \"$1\"."
+    echo
+    printUsage "$0"
+    exit 2
+elif [ ! "$action" ]; then
+    echo "ERROR: No action passed: $ACTIONS"
+    echo
+    printUsage "$0"
+    exit 2
+elif [ ! "$table" ]; then
+    echo 'ERROR: No TABLE passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+
+getAll()
+{
+    cat -- "$TABLE_FILESPEC" 2>/dev/null || return 1
+}
+
+getAsDictionary()
+{
+    # Note: Though dictName must be a valid shell variable name that would need
+    # no escaping, do so to avoid sed errors and instead have an invalid name
+    # complained about by eval().
+    local literalDictName="$dictName"
+    literalDictName="${literalDictName//\\/\\\\}"
+    literalDictName="${literalDictName//&/\\&}"
+
+    [ -r "$TABLE_FILESPEC" ] && printf 'declare -A %s\n' "$dictName"
+
+    sed -e "/[][\\ \`'\"\\n\\r\\t\\v?*!+]/{ s#'#'\\\\''#g; s#.*#'&'# }" \
+	-e "s#.*#${literalDictName//#/\\#}[&]=${PICODB_DICT_VALUE:-t}#" \
+	-- "$TABLE_FILESPEC" 2>/dev/null || return 1
+}
+
+get()
+{
+    [ -e "$TABLE_FILESPEC" ] || return 1
+    sed -n -e "/^${key}=/{ p; q }" -e '$q 4' -- "$TABLE_FILESPEC" 2>/dev/null
+}
+
+query()
+{
+    grep --quiet --fixed-strings --line-regexp --regexp "$key" -- "$TABLE_FILESPEC" 2>/dev/null
+    case $? in
+	0)  return 0;;
+	1)  return 4;;
+	2)  return 1;;
+	*)  return 3;;
+    esac
+}
+
+initializeTable()
+{
+    > "$TABLE_FILESPEC"
+}
+update()
+{
+    if [ ${#keys[@]} -eq 0 ]; then
+	echo 'ERROR: Need KEY to update.'
+	echo
+	printUsage "$0"
+	exit 2
+    fi >&2
+
+    [ -s "$TABLE_FILESPEC" ] || initializeTable || return 1
+
+    if [ ${#keys[@]} -eq 1 ]; then
+	# Optimization for single key.
+	key="${keys[0]}"
+	query || printf '%s\n' "$key" >> "$TABLE_FILESPEC"
+    else
+	: # TODO
+    fi
+}
+
+delete()
+{
+    [ -e "$TABLE_FILESPEC" ] || return 1
+
+    local literalKeyPattern="$(printf %s "$key" | literalPattern)"
+    local emptyKeyWorkaround; [ -z "$key" ] && emptyKeyWorkaround='s/^/X/; '
+
+    # If we find the key, duplicate its line into the hold space; this serves as
+    # a marker that a deletion was done.
+    # If the first line is also the last, and we find the key there, just clear
+    # the line and signal a completely empty table via a special exit code, so
+    # that we can completely remove the file afterwards (as this cannot be done
+    # from within sed).
+    # On the last line, we check the hold space, and indicate unsuccessful
+    # deletion via a special exit status.
+    sed -i \
+	-e "1{ \$ {/^${literalKeyPattern}\$/{ s/^.*$//; q 99; } } }" \
+	-e "/^${literalKeyPattern}\$/{ ${emptyKeyWorkaround}h; d; }" \
+	-e '${ x; /./{ x; b; }; x; }' \
+	-e '$q 4' \
+	-- "$TABLE_FILESPEC"
+    status=$?
+    if [ $status -eq 99 ]; then
+	drop
+	return 0
+    fi
+    return $status
+}
+
+truncate()
+{
+    if [ -r "$TABLE_FILESPEC" ]; then
+	sed -i \
+	    "${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
+	    -e d \
+	    -e ':skipHeader' \
+	    -e ':replaceWithUpdate' \
+	    -- "$TABLE_FILESPEC" || return 1
+    else
+	initializeTable
+    fi
+}
+
+drop()
+{
+    [ -e "$TABLE_FILESPEC" ] || return 1
+    rm -- "$TABLE_FILESPEC"
+}
+
+
+
+typeset -a IGNORE_HEADER_LINE_SED_ARGS=(-e '1{ /^$/b replaceWithUpdate; /^#/b skipHeader }')
+
+readonly CONFIG_DIRSPEC="${baseDir}${namespace:+/}$namespace"
+[ -d "$CONFIG_DIRSPEC" ] || mkdir -p -- "$CONFIG_DIRSPEC" || { printf >&2 'ERROR: Could not initialize database store at %s!\n' "$CONFIG_DIRSPEC"; exit 1; }
+readonly TABLE_FILESPEC="${CONFIG_DIRSPEC}/$table"
+
+"$action"

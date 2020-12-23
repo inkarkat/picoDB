@@ -1,0 +1,17 @@
+The Foo is 42
+
+x=y
+x-y
+x*y
+x y 
+x\n
+1more
+/
+\\
+/slashed\\
+multi\nline\n\ntext
+\n
+tabbed	text
+"double-quoted"
+'single-quoted'
+mi"x'd"-quoted
