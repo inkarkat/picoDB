@@ -42,6 +42,13 @@ lines"
     assert_table_row "$BATS_TEST_NAME" \$ "I muttered, \"I go with O'Brian.\""
 }
 
+@test "update with backslash" {
+    initialize_table "$BATS_TEST_NAME" from one-entry
+
+    picoDB --table "$BATS_TEST_NAME" --update \\
+    assert_table_row "$BATS_TEST_NAME" \$ \\\\
+}
+
 @test "update with various special characters" {
     initialize_table "$BATS_TEST_NAME" from one-entry
 

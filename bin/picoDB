@@ -131,7 +131,7 @@ namespace=
 table=
 isAllowEmptyKey=
 key=
-typeset -a keys=()
+typeset -a rawKeys=()
 value=
 action=
 typeset -a queriedColumns=()
@@ -173,8 +173,7 @@ do
 	--add|-a|--update|-u)
 			shift; [ -n "$action" -a "$action" != 'update' ] && multipleActionsError "$0"; action='update'
 			checkKeyArg "$@"
-			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
-			keys+=("$key")
+			rawKeys+=("$1"); shift
 			;;
 	--delete|-d)	shift; [ "$action" ] && multipleActionsError "$0"; action='delete'
 			checkKeyArg "$@"
@@ -267,7 +266,7 @@ initializeTable()
 }
 update()
 {
-    if [ ${#keys[@]} -eq 0 ]; then
+    if [ ${#rawKeys[@]} -eq 0 ]; then
 	echo 'ERROR: Need KEY to update.'
 	echo
 	printUsage "$0"
@@ -276,9 +275,11 @@ update()
 
     [ -s "$TABLE_FILESPEC" ] || initializeTable || return 1
 
-    if [ ${#keys[@]} -eq 1 ]; then
+    if [ ${#rawKeys[@]} -eq 1 ]; then
 	# Optimization for single key.
-	key="${keys[0]}"
+	local key="${rawKeys[0]}"
+	[ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
+
 	query || printf '%s\n' "$key" >> "$TABLE_FILESPEC"
     else
 	dictName=existingKeys
@@ -286,9 +287,12 @@ update()
 	eval "$existingKeyDefinition" || return 3
 
 	typeset -a newKeys=()
-	local key; for key in "${keys[@]}"
+	local key; for key in "${rawKeys[@]}"
 	do
-	    [ -z "${existingKeys["$key"]}" ] && newKeys+=("$key")
+	    if [ -z "${existingKeys["$key"]}" ]; then
+		[ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
+		newKeys+=("$key")
+	    fi
 	done
 	if [ ${#newKeys[@]} -gt 0 ]; then
 	    printf '%s\n' "${newKeys[@]}" >> "$TABLE_FILESPEC"
