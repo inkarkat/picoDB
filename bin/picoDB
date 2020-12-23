@@ -289,7 +289,11 @@ update()
 	typeset -a newKeys=()
 	local key; for key in "${rawKeys[@]}"
 	do
-	    if [ -z "${existingKeys["$key"]}" ]; then
+	    if [ -z "$key" ]; then
+		# XXX: Cannot test empty key existence via associative array, as
+		# Bash doesn't allow empty keys there.
+		grep --quiet --fixed-strings --line-regexp --regexp '' -- "$TABLE_FILESPEC" || newKeys+=('')
+	    elif [ -z "${existingKeys["$key"]}" ]; then
 		[ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
 		newKeys+=("$key")
 	    fi

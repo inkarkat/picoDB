@@ -9,6 +9,20 @@ load temp_database
     assert_table_row "$BATS_TEST_NAME" \$ "the	foo	contains		tabs	"
 }
 
+@test "update with newline" {
+    initialize_table "$BATS_TEST_NAME" from one-entry
+
+    picoDB --table "$BATS_TEST_NAME" --update $'\n'
+    assert_table_row "$BATS_TEST_NAME" \$ '\n'
+}
+
+@test "update with existing newline" {
+    initialize_table "$BATS_TEST_NAME" from special
+
+    picoDB --table "$BATS_TEST_NAME" --update $'\n'
+    assert_table_row "$BATS_TEST_NAME" \$ "mi\"x'd\"-quoted"
+}
+
 @test "update with newlines" {
     initialize_table "$BATS_TEST_NAME" from one-entry
 
