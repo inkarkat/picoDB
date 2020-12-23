@@ -11,7 +11,7 @@ load temp_database
     assert_table_row "$BATS_TEST_NAME" \$ "The Foo is 42"
 }
 
-@test "update of a larger table with an existing key multiple times updates it" {
+@test "update of a larger table with an existing key multiple times does not modify it" {
     initialize_table "$BATS_TEST_NAME" from some-entries
 
     picoDB --table "$BATS_TEST_NAME" --update "foo"

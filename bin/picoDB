@@ -281,7 +281,18 @@ update()
 	key="${keys[0]}"
 	query || printf '%s\n' "$key" >> "$TABLE_FILESPEC"
     else
-	: # TODO
+	dictName=existingKeys
+	local existingKeyDefinition="$(getAsDictionary)" || return $?
+	eval "$existingKeyDefinition" || return 3
+
+	typeset -a newKeys=()
+	local key; for key in "${keys[@]}"
+	do
+	    [ -z "${existingKeys["$key"]}" ] && newKeys+=("$key")
+	done
+	if [ ${#newKeys[@]} -gt 0 ]; then
+	    printf '%s\n' "${newKeys[@]}" >> "$TABLE_FILESPEC"
+	fi
     fi
 }
 
