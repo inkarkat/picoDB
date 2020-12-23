@@ -38,6 +38,22 @@ load canned_databases
     picoDB --table special --query '\'
 }
 
+@test "question marks key can be queried" {
+    picoDB --table special --query '???'
+}
+
+@test "asterisk key can be queried" {
+    picoDB --table special --query '*'
+}
+
+@test "glob key can be queried" {
+    picoDB --table special --query '[a-z]*'
+}
+
+@test "braces key can be queried" {
+    picoDB --table special --query '{a,b}'
+}
+
 @test "no double backslash key is there" {
     run picoDB --table special --query '\\'
     [ $status -eq 4 ]

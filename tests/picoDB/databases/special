@@ -8,6 +8,10 @@ x\n
 1more
 /
 \\
+???
+*
+[a-z]*
+{a,b}
 /slashed\\
 multi\nline\n\ntext
 \n

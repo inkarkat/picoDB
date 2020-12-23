@@ -14,6 +14,12 @@ load canned_databases
     [ "$output" = "$(cat -- "${XDG_DATA_HOME}/some-entries")" ]
 }
 
+@test "existing special character table can be gotten" {
+    run picoDB --table special --get-all
+    [ $status -eq 0 ]
+    [ "$output" = "$(cat -- "${XDG_DATA_HOME}/special")" ]
+}
+
 @test "get-all of non-existing table returns 1" {
     run picoDB --table doesNotExist --get-all
     [ $status -eq 1 ]

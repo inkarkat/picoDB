@@ -20,6 +20,34 @@ myDict[o_O]=t
 myDict[baz]=t' ]
 }
 
+@test "existing special character table can be gotten" {
+    run picoDB --table special --get-as-dictionary myDict
+    [ $status -eq 0 ]
+    eval "$output"
+
+    [ "${myDict['The Foo is 42']}" = t ]
+    # Note: Bash associative array does not support empty keys.
+    [ "${myDict['x=y']}" = t ]
+    [ "${myDict['x-y']}" = t ]
+    [ "${myDict['x*y']}" = t ]
+    [ "${myDict['x y ']}" = t ]
+    [ "${myDict[$'x\n']}" = t ]
+    [ "${myDict['1more']}" = t ]
+    [ "${myDict['/']}" = t ]
+    [ "${myDict['\']}" = t ]
+    [ "${myDict['???']}" = t ]
+    [ "${myDict['*']}" = t ]
+    [ "${myDict['[a-z]*']}" = t ]
+    [ "${myDict['{a,b}']}" = t ]
+    [ "${myDict['/slashed\']}" = t ]
+    [ "${myDict[$'multi\nline\n\ntext']}" = t ]
+    [ "${myDict[$'\n']}" = t ]
+    [ "${myDict['tabbed	text']}" = t ]
+    [ "${myDict['"double-quoted"']}" = t ]
+    [ "${myDict["'single-quoted'"]}" = t ]
+    [ "${myDict["mi\"x'd\"-quoted"]}" = t ]
+}
+
 @test "empty commented table has the declaration only" {
     run picoDB --table empty --get-as-dictionary myDict
     [ $status -eq 0 ]

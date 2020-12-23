@@ -62,7 +62,8 @@ HELPDESCRIPTION
     --add|-a|--update|-u KEY	Record KEY. An existing record is overwritten,
 				else it is appended.
     --delete|-d KEY		Delete any existing KEY record. When this is the
-				last record, the file will be completely removed.
+				last record, the file will be completely
+				removed.
     --truncate|-C		Delete all existing records; just keep a single
 				empty line. Creates the table if it doesn't
 				exist yet.
@@ -74,8 +75,10 @@ HELPDESCRIPTION
 				can use this to unescape:
 				    echo -e "\${line/#-/\\x2d}"
     --get-as-dictionary DICT-NAME
-				Get all records as keys of a Bash associative
-				array named DICT-NAME if you "eval" the output.
+				Get all records (except the empty key) as keys
+				of a Bash associative array named DICT-NAME if
+				you "eval" the output. (Values are all ${PICODB_DICT_VALUE:-t};
+				this can be configured via PICODB_DICT_VALUE.)
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -222,7 +225,9 @@ getAsDictionary()
 
     [ -r "$TABLE_FILESPEC" ] && printf 'declare -A %s\n' "$dictName"
 
-    sed -e "/[][\\ \`'\"\\n\\r\\t\\v?*!+]/{ s#'#'\\\\''#g; s#.*#'&'# }" \
+    sed -e '/^$/d' \
+	-e 's/\\\\/\n/g' -e 's/\\n/\\/g' -e 'y/\\\n/\n\\/' \
+	-e "/[][\\ \`'\"\\n\\r\\t\\v?*!+]/{ s#'#'\\\\''#g; s#.*#'&'# }" \
 	-e "s#.*#${literalDictName//#/\\#}[&]=${PICODB_DICT_VALUE:-t}#" \
 	-- "$TABLE_FILESPEC" 2>/dev/null || return 1
 }
