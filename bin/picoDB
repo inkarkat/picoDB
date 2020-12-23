@@ -16,6 +16,8 @@
 ###############################################################################
 shopt -qs extglob
 
+: ${PICODB_DICT_VALUE:=t}
+
 baseDir="${XDG_DATA_HOME:-$HOME/.local/share}"
 
 printShortUsage()
@@ -79,7 +81,7 @@ HELPDESCRIPTION
     --get-as-dictionary DICT-NAME
 				Get all records (except the empty key) as keys
 				of a Bash associative array named DICT-NAME if
-				you "eval" the output. (Values are all ${PICODB_DICT_VALUE:-t};
+				you "eval" the output. (Values are all ${PICODB_DICT_VALUE};
 				this can be configured via PICODB_DICT_VALUE.)
 EXIT STATUS:
     0	Complete success.
@@ -238,7 +240,7 @@ getAsDictionary()
     sed -e '/^$/d' \
 	-e 's/\\\\/\n/g' -e 's/\\n/\\/g' -e 'y/\\\n/\n\\/' \
 	-e "/[][\\ \`'\"\\n\\r\\t\\v?*!+]/{ s#'#'\\\\''#g; s#.*#'&'# }" \
-	-e "s#.*#${literalDictName//#/\\#}[&]=${PICODB_DICT_VALUE:-t}#" \
+	-e "s#.*#${literalDictName//#/\\#}[&]=${PICODB_DICT_VALUE}#" \
 	-- "$TABLE_FILESPEC" 2>/dev/null || return 1
 }
 
