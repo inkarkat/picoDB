@@ -1,13 +1,10 @@
 #!/usr/bin/env bats
 
 load temp_database
+load array_operations
 
-setup()
+defineKeys()
 {
-    clean_table "$BATS_TEST_NAME"
-}
-
-@test "create a table with various keys, query them individually and in bulk" {
     tabs="this	has	tab	characters"
     newlines="here
 the
@@ -20,34 +17,54 @@ text
     specials='* for {here, there} // no matter \\ ?'
     normal="Just plain text"
     spaces="  "
-    empty=""
 
-    picoDB --table "$BATS_TEST_NAME" --truncate --comment "Roundtrip table"
-    picoDB --table "$BATS_TEST_NAME" --update "TABS=$tabs"
-    picoDB --table "$BATS_TEST_NAME" --update "NEWLINES=$newlines"
-    picoDB --table "$BATS_TEST_NAME" --update "QUOTED=$quoted"
-    picoDB --table "$BATS_TEST_NAME" --update "SPECIALS=$specials"
-    picoDB --table "$BATS_TEST_NAME" --update "NORMAL=$normal"
-    picoDB --table "$BATS_TEST_NAME" --update "EMPTY=$empty"
-    picoDB --table "$BATS_TEST_NAME" --update "SPACES=$spaces"
+    keys=(
+	"$tabs"
+	"$newlines"
+	"$quoted"
+	"$specials"
+	"$normal"
+	"$spaces"
+    )
+}
+setup()
+{
+    clean_table "$BATS_TEST_NAME"
+}
 
-    eval "$(picoDB --table "$BATS_TEST_NAME" --get-all)"
-    [ "$TABS" = "$tabs" ]
-    [ "$NEWLINES" = "$newlines" ]
-    [ "$QUOTED" = "$quoted" ]
-    [ "$SPECIALS" = "$specials" ]
-    [ "$NORMAL" = "$normal" ]
-    [ "$EMPTY" = "$empty" ]
-    [ "$SPACES" = "$spaces" ]
+@test "create a table with various keys, query them individually, in bulk as lines, in bulk via dict" {
+    picoDB --table "$BATS_TEST_NAME" --truncate
 
+    typeset -a keys; defineKeys
+    local key; for key in "${keys[@]}"
+    do
+	picoDB --table "$BATS_TEST_NAME" --add "$key"
+    done
 
-    [ "$tabs" = "$(picoDB --table "$BATS_TEST_NAME" --query TABS)" ]
-    [ "$newlines" = "$(picoDB --table "$BATS_TEST_NAME" --query NEWLINES)" ]
-    [ "$quoted" = "$(picoDB --table "$BATS_TEST_NAME" --query QUOTED)" ]
-    [ "$specials" = "$(picoDB --table "$BATS_TEST_NAME" --query SPECIALS)" ]
-    [ "$normal" = "$(picoDB --table "$BATS_TEST_NAME" --query NORMAL)" ]
-    [ "$empty" = "$(picoDB --table "$BATS_TEST_NAME" --query EMPTY)" ]
-    [ "$spaces" = "$(picoDB --table "$BATS_TEST_NAME" --query SPACES)" ]
+    for key in "${keys[@]}"
+    do
+	picoDB --table "$BATS_TEST_NAME" --exists "$key"
+    done
+
+    readarray -t lines < <(picoDB --table "$BATS_TEST_NAME" --get-all)
+
+    local line; for line in "${lines[@]}"
+    do
+	unescapedLine="$(echo -e "${line/#-/\x2d}X")"
+	if ! contains "${unescapedLine%X}" "${keys[@]}"; then
+	    echo >&3 "missing: $unescapedLine"
+	    return 1
+	fi
+    done
+
+    run picoDB --table "$BATS_TEST_NAME" --get-as-dictionary myDict
+    [ $status -eq 0 ]
+    eval "$output"
+
+    local key; for key in "${keys[@]}"
+    do
+	[ "${myDict["$key"]}" = t ]
+    done
 }
 
 @test "create, query, update, query, delete, query, drop" {
@@ -55,23 +72,29 @@ text
     text2="Even simpler"
     text3="meaningless"
 
-    picoDB --table "$BATS_TEST_NAME" --comment "Roundtrip table" --update "VALUE=$text1"
-    picoDB --table "$BATS_TEST_NAME" --update "ALT=$text2"
+    picoDB --table "$BATS_TEST_NAME" --update "$text1"
+    picoDB --table "$BATS_TEST_NAME" --update "$text2"
 
-    eval "$(picoDB --table "$BATS_TEST_NAME" --get VALUE)"
-    [ "$VALUE" = "$text1" ]
+    eval "$(PICODB_DICT_VALUE=1 picoDB --table "$BATS_TEST_NAME" --get-as-dictionary values)"
+    [ "${values["$text1"]}" = 1 ]
+    [ "${values["$text2"]}" = 1 ]
+    [ -z "${values["$text3"]}" ]
 
-    picoDB --table "$BATS_TEST_NAME" --update "VALUE=$text3"
-    picoDB --table "$BATS_TEST_NAME" --delete ALT
+    picoDB --table "$BATS_TEST_NAME" --update "$text3"
+    picoDB --table "$BATS_TEST_NAME" --delete "$text2"
 
-    [ "$text3" = "$(picoDB --table "$BATS_TEST_NAME" --query VALUE)" ]
+    picoDB --table "$BATS_TEST_NAME" --query "$text1"
+    ! picoDB --table "$BATS_TEST_NAME" --query "$text2"
+    picoDB --table "$BATS_TEST_NAME" --query "$text3"
 
-    picoDB --table "$BATS_TEST_NAME" --delete VALUE
+    picoDB --table "$BATS_TEST_NAME" --delete "$text1"
 
-    [ "" = "$(picoDB --table "$BATS_TEST_NAME" --query VALUE)" ]
+    ! picoDB --table "$BATS_TEST_NAME" --query "$text1"
+    ! picoDB --table "$BATS_TEST_NAME" --query "$text2"
+    picoDB --table "$BATS_TEST_NAME" --query "$text3"
 
     picoDB --table "$BATS_TEST_NAME" --drop
 
-    run picoDB --table "$BATS_TEST_NAME" --query VALUE
+    run picoDB --table "$BATS_TEST_NAME" --query "$text1"
     [ $status -eq 1 ]
 }

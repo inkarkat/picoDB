@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 load temp_database
+load array_operations
 
 defineSpecialKeys()
 {
@@ -49,16 +50,6 @@ setup()
     do
 	[ "${myDict["$key"]}" = t ]
     done
-}
-
-contains()
-{
-    local elem needle=$1; shift
-    for elem
-    do
-	[ "$needle" = "$elem" ] && return 0
-    done
-    return 1
 }
 
 @test "special character keys can be inserted and then obtained as escaped records" {
