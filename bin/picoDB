@@ -44,8 +44,8 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Records and retrieves individual KEYs inside a TABLE [within NAMESPACE], using
-simple line-based records as storage.
+Records and retrieves individual unique KEYs inside a TABLE [within NAMESPACE],
+using simple line-based records as storage.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
