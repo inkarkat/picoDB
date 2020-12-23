@@ -68,9 +68,9 @@ HELPDESCRIPTION
     --delete|-d KEY		Delete any existing KEY record. When this is the
 				last record, the file will be completely
 				removed.
-    --truncate|-C		Delete all existing records; just keep a single
-				empty line. Creates the table if it doesn't
-				exist yet.
+    --truncate|-C		Delete all existing records; just keep a
+				completely empty file. Creates the table if it
+				doesn't exist yet.
     --drop|-D			Completely wipe all records and the table
 				configuration file itself.
     --exists|-e|--query|-q KEY	Query whether KEY exists.
@@ -123,11 +123,6 @@ escapeNewline()
 {
     sed ':a; s/\\/\\\\/g; x; G; 1s/\n//; s/\n/\\n/; h; N; s/.*\n//; ta' <<<"${1?}"
 }
-unescape()
-{
-    [ $# -ge 1 ] && line="$1"
-    echo -e "${line/#-/\\x2d}"
-}
 readonly ACTIONS='--add / --update, --delete, --truncate, --drop, --exists / --query, --get-all, --get-as-dictionary'
 multipleActionsError()
 {
@@ -141,12 +136,7 @@ table=
 isAllowEmptyKey=
 key=
 typeset -a rawKeys=()
-value=
 action=
-typeset -a queriedColumns=()
-typeset -A updatedColumnValues=()
-isOmitKey=
-outputFormat=
 dictName=
 while [ $# -ne 0 ]
 do
@@ -188,7 +178,7 @@ do
 			checkKeyArg "$@"
 			key="$1"; shift; [ "${key/[$'\n'\\]/}" = "$key" ] || key="$(escapeNewline "$key")"
 			;;
-	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='truncate';;
+	--truncate|-C)	shift; [ "$action" ] && multipleActionsError "$0"; action='initializeTable';;
 	--drop|-D)	shift; [ "$action" ] && multipleActionsError "$0"; action='drop';;
 	--exists|-e|--query|-q)
 			shift; [ "$action" ] && multipleActionsError "$0"; action='query'
@@ -342,20 +332,6 @@ delete()
     return $status
 }
 
-truncate()
-{
-    if [ -r "$TABLE_FILESPEC" ]; then
-	sed -i \
-	    "${IGNORE_HEADER_LINE_SED_ARGS[@]}" \
-	    -e d \
-	    -e ':skipHeader' \
-	    -e ':replaceWithUpdate' \
-	    -- "$TABLE_FILESPEC" || return 1
-    else
-	initializeTable
-    fi
-}
-
 drop()
 {
     [ -e "$TABLE_FILESPEC" ] || return 1
@@ -363,8 +339,6 @@ drop()
 }
 
 
-
-typeset -a IGNORE_HEADER_LINE_SED_ARGS=(-e '1{ /^$/b replaceWithUpdate; /^#/b skipHeader }')
 
 readonly CONFIG_DIRSPEC="${baseDir}${namespace:+/}$namespace"
 [ -d "$CONFIG_DIRSPEC" ] || mkdir -p -- "$CONFIG_DIRSPEC" || { printf >&2 'ERROR: Could not initialize database store at %s!\n' "$CONFIG_DIRSPEC"; exit 1; }
