@@ -30,7 +30,7 @@ printShortUsage()
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -C|--truncate'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -D|--drop'
     printf 'Usage: %q %s\n' "$(basename "$1")" '    ... -e|--exists|-q|--query KEY'
-    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME'
+    printf 'Usage: eval "$(%q %s)"\n' "$(basename "$1")" '-G|--get-all|--get-as-dictionary DICT-NAME [--omit-declaration]'
 }
 printUsage()
 {
@@ -81,8 +81,13 @@ HELPDESCRIPTION
     --get-as-dictionary DICT-NAME
 				Get all records (except the empty key) as keys
 				of a Bash associative array named DICT-NAME if
-				you "eval" the output. (Values are all ${PICODB_DICT_VALUE};
-				this can be configured via PICODB_DICT_VALUE.)
+				you "eval" the output. The array gets declared
+				but is not cleared. (Values are all ${PICODB_DICT_VALUE}; this
+				can be configured via PICODB_DICT_VALUE.)
+    --omit-declaration		Assume that DICT-NAME has already been declared
+				as a Bash associative array and omit its
+				declaration (needed when you want to fill a
+				globally defined array within a function).
 EXIT STATUS:
     0	Complete success.
     1	Failed to read / write / remove the table file.
@@ -139,6 +144,7 @@ key=
 typeset -a rawKeys=()
 action=
 dictName=
+isPrintDeclaration=t
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -197,6 +203,8 @@ do
 			    exit 2
 			fi >&2
 			;;
+	--omit-declaration)
+			shift; isPrintDeclaration=;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -234,7 +242,7 @@ getAsDictionary()
     literalDictName="${literalDictName//\\/\\\\}"
     literalDictName="${literalDictName//&/\\&}"
 
-    [ -r "$TABLE_FILESPEC" ] && printf 'declare -A %s\n' "$dictName"
+    [ -r "$TABLE_FILESPEC" ] && [ "$isPrintDeclaration" ] && printf 'declare -A %s\n' "$dictName"
 
     sed -e '/^$/d' \
 	-e 's/\\\\/\n/g' -e 's/\\n/\\/g' -e 'y/\\\n/\n\\/' \
