@@ -1,7 +1,6 @@
 #!/usr/bin/env bats
 
 load temp_database
-skip
 
 @test "update of a table is rejected because second key is invalid" {
     initialize_table "$BATS_TEST_NAME" from one-entry
