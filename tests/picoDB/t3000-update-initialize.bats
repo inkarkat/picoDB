@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 
+load fixture
 load temp_database
 
 setup()

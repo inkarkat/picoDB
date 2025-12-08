@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 
+load fixture
 load temp_database
 
 @test "update of a table with two new keys in unified argument form adds both records" {
@@ -14,22 +15,22 @@ load temp_database
 
 @test "update of a table with two existing keys in unified argument form succeeds but adds nothing" {
     initialize_table "$BATS_TEST_NAME" from some-entries
-    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 5 ]
+    assert_row_count 5
 
     picoDB --table "$BATS_TEST_NAME" --update "bar" --update "Foo"
 
-    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 5 ]
+    assert_row_count 5
     assert_table_row "$BATS_TEST_NAME" 2 "Foo"
     assert_table_row "$BATS_TEST_NAME" 3 "bar"
 }
 
 @test "update of a table with two out of four existing keys in unified argument form adds just the missing keys " {
     initialize_table "$BATS_TEST_NAME" from some-entries
-    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 5 ]
+    assert_row_count 5
 
     picoDB --table "$BATS_TEST_NAME" --update "bar" --update "new" --update "Foo" --update "also new"
 
-    [ "$(get_row_number "$BATS_TEST_NAME")" -eq 7 ]
+    assert_row_count 7
     assert_table_row "$BATS_TEST_NAME" 2 "Foo"
     assert_table_row "$BATS_TEST_NAME" 3 "bar"
     assert_table_row "$BATS_TEST_NAME" 6 "new"

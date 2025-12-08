@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 
+load fixture
 load temp_database
 load array_operations
 
@@ -57,8 +58,7 @@ setup()
 	fi
     done
 
-    run picoDB --table "$BATS_TEST_NAME" --get-as-dictionary myDict
-    [ $status -eq 0 ]
+    run -0 picoDB --table "$BATS_TEST_NAME" --get-as-dictionary myDict
     eval "$output"
 
     local key; for key in "${keys[@]}"
@@ -84,17 +84,16 @@ setup()
     picoDB --table "$BATS_TEST_NAME" --delete "$text2"
 
     picoDB --table "$BATS_TEST_NAME" --query "$text1"
-    ! picoDB --table "$BATS_TEST_NAME" --query "$text2"
+    run ! picoDB --table "$BATS_TEST_NAME" --query "$text2"
     picoDB --table "$BATS_TEST_NAME" --query "$text3"
 
     picoDB --table "$BATS_TEST_NAME" --delete "$text1"
 
-    ! picoDB --table "$BATS_TEST_NAME" --query "$text1"
-    ! picoDB --table "$BATS_TEST_NAME" --query "$text2"
+    run ! picoDB --table "$BATS_TEST_NAME" --query "$text1"
+    run ! picoDB --table "$BATS_TEST_NAME" --query "$text2"
     picoDB --table "$BATS_TEST_NAME" --query "$text3"
 
     picoDB --table "$BATS_TEST_NAME" --drop
 
-    run picoDB --table "$BATS_TEST_NAME" --query "$text1"
-    [ $status -eq 1 ]
+    run -1 picoDB --table "$BATS_TEST_NAME" --query "$text1"
 }

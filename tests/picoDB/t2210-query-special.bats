@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
 
+load fixture
 load canned_databases
 
 @test "empty key cannot be queried by default" {
-    run picoDB --table special --query ''
-    [ $status -eq 2 ]
-    [ "$output" = 'ERROR: Empty KEY not allowed.' ]
+    run -2 picoDB --table special --query ''
+    assert_output 'ERROR: Empty KEY not allowed.'
 }
 
 @test "empty key can be queried with --allow-empty-key" {
@@ -61,8 +61,7 @@ load canned_databases
 }
 
 @test "no double backslash key is there" {
-    run picoDB --table special --query '\\'
-    [ $status -eq 4 ]
+    run -4 picoDB --table special --query '\\'
 }
 
 @test "key with slashes can be queried" {
@@ -85,8 +84,7 @@ text"
 }
 
 @test "no double newline key is there" {
-    run picoDB --table special --query $'\n\n'
-    [ $status -eq 4 ]
+    run -4 picoDB --table special --query $'\n\n'
 }
 
 @test "double-quoted key can be queried" {

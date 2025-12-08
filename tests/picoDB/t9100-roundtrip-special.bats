@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 
+load fixture
 load temp_database
 load array_operations
 
@@ -41,8 +42,7 @@ setup()
 }
 
 @test "special character keys can be inserted and then obtained as dict" {
-    run picoDB --table "$BATS_TEST_NAME" --get-as-dictionary myDict
-    [ $status -eq 0 ]
+    run -0 picoDB --table "$BATS_TEST_NAME" --get-as-dictionary myDict
     eval "$output"
 
     typeset -a specialKeys; defineSpecialKeys

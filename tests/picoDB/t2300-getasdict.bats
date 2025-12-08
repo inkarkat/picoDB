@@ -1,28 +1,30 @@
 #!/usr/bin/env bats
 
+load fixture
 load canned_databases
 
 @test "existing single record table can be gotten" {
-    run picoDB --table one-entry --get-as-dictionary myDict
-    [ $status -eq 0 ]
-    [ "$output" = "declare -A myDict
-myDict['The Foo is 42']=t" ]
+    run -0 picoDB --table one-entry --get-as-dictionary myDict
+    assert_output - <<'EOF'
+declare -A myDict
+myDict['The Foo is 42']=t
+EOF
 }
 
 @test "existing table can be gotten" {
-    run picoDB --table some-entries --get-as-dictionary myDict
-    [ $status -eq 0 ]
-    [ "$output" = 'declare -A myDict
+    run -0 picoDB --table some-entries --get-as-dictionary myDict
+    assert_output - <<'EOF'
+declare -A myDict
 myDict[foo]=t
 myDict[Foo]=t
 myDict[bar]=t
 myDict[o_O]=t
-myDict[baz]=t' ]
+myDict[baz]=t
+EOF
 }
 
 @test "existing special character table can be gotten" {
-    run picoDB --table special --get-as-dictionary myDict
-    [ $status -eq 0 ]
+    run -0 picoDB --table special --get-as-dictionary myDict
     eval "$output"
 
     [ "${myDict['The Foo is 42']}" = t ]
@@ -49,20 +51,19 @@ myDict[baz]=t' ]
 }
 
 @test "empty commented table has the declaration only" {
-    run picoDB --table empty --get-as-dictionary myDict
-    [ $status -eq 0 ]
-    [ "$output" = 'declare -A myDict' ]
+    run -0 picoDB --table empty --get-as-dictionary myDict
+    assert_output 'declare -A myDict'
 }
 
 @test "get-as-dictionary of non-existing table returns 1" {
-    run picoDB --table doesNotExist --get-as-dictionary myDict
-    [ $status -eq 1 ]
-    [ "$output" = "" ]
+    run -1 picoDB --table doesNotExist --get-as-dictionary myDict
+    assert_output ''
 }
 
 @test "an invalid dict-name is processed just fine (but would cause eval error)" {
-    run picoDB --table one-entry --get-as-dictionary 'my&/Dict\#'
-    [ $status -eq 0 ]
-    [ "$output" = "declare -A my&/Dict\\#
-my&/Dict\\#['The Foo is 42']=t" ]
+    run -0 picoDB --table one-entry --get-as-dictionary 'my&/Dict\#'
+    assert_output - <<'EOF'
+declare -A my&/Dict\#
+my&/Dict\#['The Foo is 42']=t
+EOF
 }
